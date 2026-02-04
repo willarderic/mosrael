@@ -5,12 +5,12 @@ mod parser;
 use crate::parser::Parser;
 
 fn main() {
-    let input = String::from("x + 10 - 12");
+    let input = String::from("x + 10 - 12 * 50;");
     let tokens = lexer::lex(input);
     for tok in &tokens {
         println!("{}", tok);
     }
     let mut parser = Parser::new(tokens);
-    let expr = parser.parse_expression();
+    let expr = parser.parse_expression(0);
     println!("{}", expr.unwrap());
 }

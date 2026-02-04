@@ -24,6 +24,14 @@ pub struct Parser {
     errors: Vec<ParseError>,
 }
 
+fn get_precedence(tok: &Token) -> Result<u8, ParseError> {
+    match *tok {
+        Token::ASTERISK | Token::SLASH => Ok(5),
+        Token::PLUS | Token::DASH => Ok(3),
+        _ => Err(String::from("Token does not have precedence")),
+    }
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         let mut parser = Parser {
@@ -62,7 +70,7 @@ impl Parser {
     fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
         let op = self.curr_token.clone();
         self.advance();
-        let operand = self.parse_expression();
+        let operand = self.parse_expression(6);
         Ok(Expression::Prefix(PrefixExpression {
             op,
             operand: Box::new(operand.unwrap()),
@@ -72,7 +80,7 @@ impl Parser {
     fn parse_binary_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
         let op = self.curr_token.clone();
         self.advance();
-        let right = self.parse_expression();
+        let right = self.parse_expression(get_precedence(&op).unwrap());
         Ok(Expression::Infix(InfixExpression {
             op,
             left: Box::new(left),
@@ -80,7 +88,7 @@ impl Parser {
         }))
     }
 
-    pub fn parse_expression(&mut self) -> Result<Expression, ParseError> {
+    pub fn parse_expression(&mut self, precedence: u8) -> Result<Expression, ParseError> {
         // Prefix
         let mut left = match self.curr_token {
             Token::IDENTIFIER(_) => self.parse_identifier_expression(),
@@ -89,13 +97,22 @@ impl Parser {
             _ => return Err(String::from("No matching prefix parselet")),
         };
 
-        self.advance();
-        // Infix
-        left = match self.curr_token {
-            Token::PLUS | Token::DASH => self.parse_binary_expression(left.unwrap()),
-            Token::ASTERISK | Token::SLASH => self.parse_binary_expression(left.unwrap()),
-            _ => left, // not an infix expression
-        };
+        while self.peek_token != Token::SEMICOLON
+            && precedence < get_precedence(&self.peek_token).unwrap()
+        {
+            // Infix
+            left = match self.peek_token {
+                Token::PLUS | Token::DASH => {
+                    self.advance();
+                    self.parse_binary_expression(left.unwrap())
+                }
+                Token::ASTERISK | Token::SLASH => {
+                    self.advance();
+                    self.parse_binary_expression(left.unwrap())
+                }
+                _ => left, // not an infix expression
+            };
+        }
 
         left
     }
