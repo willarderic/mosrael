@@ -2,8 +2,11 @@ use std::iter;
 use std::iter::Peekable;
 use std::vec;
 
-#[derive(Debug)]
-pub enum TokenType {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Token {
+    UNKNOWN,
+    IDENTIFIER(String),
+    NUMBER(i64),
     LPAREN,
     RPAREN,
     LBRACKET,
@@ -25,48 +28,102 @@ pub enum TokenType {
     LEQ,
     GEQ,
     QUESTION,
-    IDENTIFIER,
     FN,
     IF,
     RETURN,
-    NUMBER,
-    UNKNOWN,
+    EOF,
 }
 
-pub struct Token {
-    pub token_type: TokenType,
-    pub lexeme: String,
-}
-
-impl Token {
-    pub fn new(token_type: TokenType, lexeme: String) -> Token {
-        Token { token_type, lexeme }
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UNKNOWN => write!(f, "(UNKNOWN, )"),
+            Self::NUMBER(num) => write!(f, "(NUMBER, {})", num),
+            Self::IDENTIFIER(ident) => write!(f, "(IDENTIFIER, {})", ident),
+            Self::LPAREN => write!(f, "(LPAREN, ()"),
+            Self::RPAREN => write!(f, "(RPAREN, ))"),
+            Self::LBRACKET => write!(f, "(LBRACKET, [)"),
+            Self::RBRACKET => write!(f, "(RBRACKET, ])"),
+            Self::RBRACE => write!(f, "(RBRACE, }})"),
+            Self::LBRACE => write!(f, "(LBRACE, {{)"),
+            Self::SEMICOLON => write!(f, "(SEMICOLON, ;)"),
+            Self::COLON => write!(f, "(COLON, :)"),
+            Self::PLUS => write!(f, "(PLUS, +)"),
+            Self::DASH => write!(f, "(DASH, -)"),
+            Self::ASTERISK => write!(f, "(ASTERISK, *)"),
+            Self::SLASH => write!(f, "(SLASH, /)"),
+            Self::ASSIGN => write!(f, "(ASSIGN, =)"),
+            Self::BANGEQ => write!(f, "(BANGEQ, !=)"),
+            Self::BANG => write!(f, "(BANG, !)"),
+            Self::LT => write!(f, "(LT, <)"),
+            Self::GT => write!(f, "(GT, >)"),
+            Self::LEQ => write!(f, "(LEQ, <=)"),
+            Self::GEQ => write!(f, "(GEQ, >=)"),
+            Self::QUESTION => write!(f, "(QUESTION, ?)"),
+            Self::FN => write!(f, "(FN, fn)"),
+            Self::IF => write!(f, "(IF, if)"),
+            Self::RETURN => write!(f, "(RETURN, return)"),
+            Self::EOF => write!(f, "(EOF, )"),
+        }
     }
 }
 
-fn tokentype_from(lexeme: &str) -> TokenType {
+impl Token {
+    pub fn get_literal(&self) -> String {
+        match self {
+            Self::IDENTIFIER(ident) => ident.to_owned(),
+            Self::NUMBER(num) => num.to_string(),
+            Self::LPAREN => '('.to_string(),
+            Self::RPAREN => ')'.to_string(),
+            Self::LBRACKET => '['.to_string(),
+            Self::RBRACKET => ']'.to_string(),
+            Self::LBRACE => '{'.to_string(),
+            Self::RBRACE => '}'.to_string(),
+            Self::SEMICOLON => ';'.to_string(),
+            Self::COLON => ':'.to_string(),
+            Self::PLUS => '+'.to_string(),
+            Self::DASH => '-'.to_string(),
+            Self::ASTERISK => '*'.to_string(),
+            Self::SLASH => '/'.to_string(),
+            Self::ASSIGN => '='.to_string(),
+            Self::BANGEQ => "!=".to_string(),
+            Self::BANG => '!'.to_string(),
+            Self::LT => '<'.to_string(),
+            Self::GT => '>'.to_string(),
+            Self::LEQ => "<=".to_string(),
+            Self::GEQ => ">=".to_string(),
+            Self::QUESTION => '?'.to_string(),
+            Self::FN => "fn".to_string(),
+            Self::IF => "if".to_string(),
+            Self::RETURN => "return".to_string(),
+            _ => '\0'.to_string(),
+        }
+    }
+}
+
+fn token_from(lexeme: &str) -> Token {
     match lexeme {
-        "<=" => TokenType::LEQ,
-        ">=" => TokenType::GEQ,
-        "!=" => TokenType::BANGEQ,
-        "<" => TokenType::LT,
-        ">" => TokenType::GT,
-        "!" => TokenType::BANG,
-        ":" => TokenType::COLON,
-        "+" => TokenType::PLUS,
-        "-" => TokenType::DASH,
-        "/" => TokenType::SLASH,
-        "*" => TokenType::ASTERISK,
-        "{" => TokenType::LBRACE,
-        "}" => TokenType::RBRACE,
-        ")" => TokenType::RPAREN,
-        "(" => TokenType::LPAREN,
-        "[" => TokenType::LBRACKET,
-        "]" => TokenType::RBRACKET,
-        "?" => TokenType::QUESTION,
-        ";" => TokenType::SEMICOLON,
-        "=" => TokenType::ASSIGN,
-        _ => TokenType::UNKNOWN,
+        "<=" => Token::LEQ,
+        ">=" => Token::GEQ,
+        "!=" => Token::BANGEQ,
+        "<" => Token::LT,
+        ">" => Token::GT,
+        "!" => Token::BANG,
+        ":" => Token::COLON,
+        "+" => Token::PLUS,
+        "-" => Token::DASH,
+        "/" => Token::SLASH,
+        "*" => Token::ASTERISK,
+        "{" => Token::LBRACE,
+        "}" => Token::RBRACE,
+        ")" => Token::RPAREN,
+        "(" => Token::LPAREN,
+        "[" => Token::LBRACKET,
+        "]" => Token::RBRACKET,
+        "?" => Token::QUESTION,
+        ";" => Token::SEMICOLON,
+        "=" => Token::ASSIGN,
+        _ => Token::UNKNOWN,
     }
 }
 
@@ -123,10 +180,10 @@ fn punctuator_eq<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>) -> 
     if peeked == '=' {
         let peeked = chars.next().unwrap();
         let lexeme: String = format!("{c}{peeked}");
-        return Token::new(tokentype_from(lexeme.as_str()), lexeme);
+        return token_from(lexeme.as_str());
     } else {
         let lexeme: String = c.to_string();
-        return Token::new(tokentype_from(lexeme.as_str()), lexeme);
+        return token_from(lexeme.as_str());
     }
 }
 
@@ -137,7 +194,7 @@ fn handle_punctuator<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>)
         '!' => punctuator_eq(c, chars),
         _ => {
             let lexeme: String = c.to_string();
-            Token::new(tokentype_from(lexeme.as_str()), lexeme)
+            token_from(lexeme.as_str())
         }
     }
 }
@@ -151,14 +208,14 @@ fn handle_number<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>) -> 
         }
         number.push(n);
     }
-    Token::new(TokenType::NUMBER, number)
+    Token::NUMBER(number.parse::<i64>().unwrap())
 }
 
 fn handle_keyword(word: &str) -> Option<Token> {
     match word {
-        "if" => Some(Token::new(TokenType::IF, String::from("if"))),
-        "return" => Some(Token::new(TokenType::RETURN, String::from("return"))),
-        "fn" => Some(Token::new(TokenType::FN, String::from("fn"))),
+        "if" => Some(Token::IF),
+        "return" => Some(Token::RETURN),
+        "fn" => Some(Token::FN),
         _ => None,
     }
 }
@@ -193,7 +250,7 @@ pub fn lex(input: String) -> Vec<Token> {
             }
             tokens.push(match handle_keyword(word.as_str()) {
                 Some(tok) => tok,
-                None => Token::new(TokenType::IDENTIFIER, word),
+                None => Token::IDENTIFIER(word),
             })
         }
     }

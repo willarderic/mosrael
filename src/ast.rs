@@ -19,29 +19,35 @@ pub enum Node {
 //    }
 //}
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Program {
     statements: Vec<Statement>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Expression(ExpressionStatement),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExpressionStatement {
     pub expr: Expression,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PrefixExpression {
-    op: Token,
-    operand: Box<Expression>,
+    pub op: Token,
+    pub operand: Box<Expression>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InfixExpression {
-    op: Token,
-    left: Box<Expression>,
-    right: Box<Expression>,
+    pub op: Token,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     Identifier(String),
     Number(u64),
