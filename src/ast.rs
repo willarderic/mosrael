@@ -5,20 +5,19 @@ use crate::lexer::Token;
 
 /*
 program     → decl_list EOF
+
 decl        → fn_decl
             | var_decl ;
 decl_list   → epsilon
             | decl decl_list ;
 fn_decl     → "fn" ident "(" ")" block ;
-var_decl    → "var" ident "=" integer ;
+var_decl    → "var" ident "=" expr ;
 block       → stmt_list ;
+
 stmt        → return_stmt ;
 stmt_list   → epsilon
             | stmt stmt_list ";" ;
 return_stmt → "return" expr;
-
-
-
 
 expr        → literal
             | unary
@@ -68,7 +67,7 @@ pub struct Function {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Variable {
     pub name: String,
-    pub value: u64,
+    pub value: Expression,
 }
 
 impl Display for Declaration {

@@ -101,12 +101,7 @@ impl Parser {
         };
         self.advance();
         self.consume(Token::ASSIGN);
-
-        let value = match &self.curr_token {
-            Token::NUMBER(num) => num.clone(),
-            _ => panic!("Expected number, got {}", self.curr_token),
-        };
-        self.advance();
+        let value = self.parse_expr();
         self.consume(Token::SEMICOLON);
 
         Declaration::VariableDeclaration(Variable { name, value })
