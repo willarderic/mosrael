@@ -1,17 +1,19 @@
 /*
- expression     → literal
+
+
+expression     → literal
                | unary
                | binary
                | grouping ;
 
-literal        → NUMBER | STRING | "true" | "false" | "nil" ;
+literal        → NUMBER | STRING | IDENT | "true" | "false" | "null" ;
 grouping       → "(" expression ")" ;
 unary          → ( "-" | "!" ) expression ;
 binary         → expression operator expression ;
 operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
                | "+"  | "-"  | "*" | "/" ;
 */
-use crate::ast::{Expression, InfixExpression, PrefixExpression};
+use crate::ast::{Declaration, Function, Node, Statement};
 use crate::lexer::Token;
 
 type ParseError = String;
@@ -21,15 +23,6 @@ pub struct Parser {
     curr_token: Token,
     peek_token: Token,
     index: usize,
-    errors: Vec<ParseError>,
-}
-
-fn get_precedence(tok: &Token) -> Result<u8, ParseError> {
-    match *tok {
-        Token::ASTERISK | Token::SLASH => Ok(5),
-        Token::PLUS | Token::DASH => Ok(3),
-        _ => Err(String::from("Token does not have precedence")),
-    }
 }
 
 impl Parser {
@@ -39,7 +32,6 @@ impl Parser {
             curr_token: Token::UNKNOWN,
             peek_token: Token::UNKNOWN,
             index: 0,
-            errors: Vec::new(),
         };
 
         parser.advance();
@@ -55,65 +47,80 @@ impl Parser {
             None => Token::EOF,
         };
         self.index += 1;
+        println!("curr: {}, peek: {}", self.curr_token, self.peek_token);
     }
 
-    fn parse_identifier_expression(&mut self) -> Result<Expression, ParseError> {
-        Ok(Expression::Identifier(self.curr_token.get_literal()))
+    fn consume(&mut self, tok: Token) {
+        if self.curr_token == tok {
+            self.advance();
+        } else {
+            panic!("Expected {}, got {}", tok, self.curr_token);
+        }
     }
 
-    fn parse_number_expression(&mut self) -> Result<Expression, ParseError> {
-        Ok(Expression::Number(
-            self.curr_token.get_literal().parse::<u64>().unwrap(),
-        ))
-    }
-
-    fn parse_prefix_expression(&mut self) -> Result<Expression, ParseError> {
-        let op = self.curr_token.clone();
-        self.advance();
-        let operand = self.parse_expression(6);
-        Ok(Expression::Prefix(PrefixExpression {
-            op,
-            operand: Box::new(operand.unwrap()),
-        }))
-    }
-
-    fn parse_binary_expression(&mut self, left: Expression) -> Result<Expression, ParseError> {
-        let op = self.curr_token.clone();
-        self.advance();
-        let right = self.parse_expression(get_precedence(&op).unwrap());
-        Ok(Expression::Infix(InfixExpression {
-            op,
-            left: Box::new(left),
-            right: Box::new(right.unwrap()),
-        }))
-    }
-
-    pub fn parse_expression(&mut self, precedence: u8) -> Result<Expression, ParseError> {
-        // Prefix
-        let mut left = match self.curr_token {
-            Token::IDENTIFIER(_) => self.parse_identifier_expression(),
-            Token::NUMBER(_) => self.parse_number_expression(),
-            Token::DASH => self.parse_prefix_expression(),
-            _ => return Err(String::from("No matching prefix parselet")),
-        };
-
-        while self.peek_token != Token::SEMICOLON
-            && precedence < get_precedence(&self.peek_token).unwrap()
-        {
-            // Infix
-            left = match self.peek_token {
-                Token::PLUS | Token::DASH => {
-                    self.advance();
-                    self.parse_binary_expression(left.unwrap())
-                }
-                Token::ASTERISK | Token::SLASH => {
-                    self.advance();
-                    self.parse_binary_expression(left.unwrap())
-                }
-                _ => left, // not an infix expression
-            };
+    pub fn parse(&mut self) -> Node {
+        let mut decls = Vec::new();
+        while self.curr_token != Token::EOF {
+            decls.push(self.parse_decl());
         }
 
-        left
+        Node::Program(decls)
+    }
+
+    fn parse_decl(&mut self) -> Declaration {
+        match self.curr_token {
+            Token::FN => self.parse_fn_decl(),
+            _ => panic!("No matching declaration"),
+        }
+    }
+
+    fn parse_fn_decl(&mut self) -> Declaration {
+        self.consume(Token::FN);
+
+        let name = match &self.curr_token {
+            Token::IDENTIFIER(ident) => ident.clone(),
+            _ => panic!("Expected identifier, got {}", self.curr_token),
+        };
+        self.advance();
+
+        self.consume(Token::LPAREN);
+        self.consume(Token::RPAREN);
+
+        let stmts = self.parse_block();
+
+        Declaration::FunctionDeclaration(Function { name, stmts })
+    }
+
+    fn parse_block(&mut self) -> Vec<Statement> {
+        self.consume(Token::LBRACE);
+        let mut stmts: Vec<Statement> = Vec::new();
+        while self.curr_token != Token::RBRACE {
+            stmts.push(self.parse_statement());
+        }
+        self.consume(Token::RBRACE);
+
+        stmts
+    }
+
+    fn parse_statement(&mut self) -> Statement {
+        let stmt = match self.curr_token {
+            Token::RETURN => self.parse_return_statement(),
+            _ => panic!("Expect statement, got {}", self.curr_token),
+        };
+
+        self.consume(Token::SEMICOLON);
+
+        stmt
+    }
+
+    fn parse_return_statement(&mut self) -> Statement {
+        self.consume(Token::RETURN);
+        match self.curr_token {
+            Token::NUMBER(num) => {
+                self.advance();
+                Statement::ReturnStatement(num)
+            }
+            _ => panic!("Expected number, got {}", self.curr_token),
+        }
     }
 }

@@ -2,15 +2,28 @@ mod ast;
 mod lexer;
 mod parser;
 
+use std::env;
+use std::fs;
+
+use crate::lexer::lex;
 use crate::parser::Parser;
 
 fn main() {
-    let input = String::from("x + 10 - 12 * 50;");
-    let tokens = lexer::lex(input);
-    for tok in &tokens {
-        println!("{}", tok);
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() != 2 {
+        panic!("usage: ./mosraelc <input program>");
     }
+
+    let file_path = &args[1];
+
+    let contents = fs::read_to_string(file_path).expect("failed to read file");
+
+    println!("Contents: \n{contents}");
+    let tokens = lex(contents);
+    println!("Tokens:");
+    tokens.iter().for_each(|tok| println!("\t{}", tok));
     let mut parser = Parser::new(tokens);
-    let expr = parser.parse_expression(0);
-    println!("{}", expr.unwrap());
+    let program = parser.parse();
+    println!("AST:\n{}", program);
 }

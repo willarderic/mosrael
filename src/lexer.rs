@@ -6,7 +6,7 @@ use std::vec;
 pub enum Token {
     UNKNOWN,
     IDENTIFIER(String),
-    NUMBER(i64),
+    NUMBER(u64),
     LPAREN,
     RPAREN,
     LBRACKET,
@@ -22,11 +22,12 @@ pub enum Token {
     SLASH,
     ASSIGN,
     BANG,
-    BANGEQ,
     LT,
     GT,
     LEQ,
     GEQ,
+    EQ,
+    NEQ,
     QUESTION,
     FN,
     IF,
@@ -53,12 +54,13 @@ impl std::fmt::Display for Token {
             Self::ASTERISK => write!(f, "(ASTERISK, *)"),
             Self::SLASH => write!(f, "(SLASH, /)"),
             Self::ASSIGN => write!(f, "(ASSIGN, =)"),
-            Self::BANGEQ => write!(f, "(BANGEQ, !=)"),
             Self::BANG => write!(f, "(BANG, !)"),
             Self::LT => write!(f, "(LT, <)"),
             Self::GT => write!(f, "(GT, >)"),
             Self::LEQ => write!(f, "(LEQ, <=)"),
             Self::GEQ => write!(f, "(GEQ, >=)"),
+            Self::EQ => write!(f, "(EQ, =="),
+            Self::NEQ => write!(f, "(NEQ, !=)"),
             Self::QUESTION => write!(f, "(QUESTION, ?)"),
             Self::FN => write!(f, "(FN, fn)"),
             Self::IF => write!(f, "(IF, if)"),
@@ -86,12 +88,13 @@ impl Token {
             Self::ASTERISK => '*'.to_string(),
             Self::SLASH => '/'.to_string(),
             Self::ASSIGN => '='.to_string(),
-            Self::BANGEQ => "!=".to_string(),
             Self::BANG => '!'.to_string(),
             Self::LT => '<'.to_string(),
             Self::GT => '>'.to_string(),
             Self::LEQ => "<=".to_string(),
             Self::GEQ => ">=".to_string(),
+            Self::EQ => "==".to_string(),
+            Self::NEQ => "!=".to_string(),
             Self::QUESTION => '?'.to_string(),
             Self::FN => "fn".to_string(),
             Self::IF => "if".to_string(),
@@ -105,7 +108,8 @@ fn token_from(lexeme: &str) -> Token {
     match lexeme {
         "<=" => Token::LEQ,
         ">=" => Token::GEQ,
-        "!=" => Token::BANGEQ,
+        "!=" => Token::NEQ,
+        "==" => Token::EQ,
         "<" => Token::LT,
         ">" => Token::GT,
         "!" => Token::BANG,
@@ -208,7 +212,7 @@ fn handle_number<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>) -> 
         }
         number.push(n);
     }
-    Token::NUMBER(number.parse::<i64>().unwrap())
+    Token::NUMBER(number.parse::<u64>().unwrap())
 }
 
 fn handle_keyword(word: &str) -> Option<Token> {
@@ -254,6 +258,7 @@ pub fn lex(input: String) -> Vec<Token> {
             })
         }
     }
+    tokens.push(Token::EOF);
 
     tokens
 }
