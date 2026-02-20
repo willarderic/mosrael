@@ -29,9 +29,11 @@ pub enum Token {
     EQ,
     NEQ,
     QUESTION,
+    // Keywords
     FN,
     IF,
     RETURN,
+    VAR,
     EOF,
 }
 
@@ -65,6 +67,7 @@ impl std::fmt::Display for Token {
             Self::FN => write!(f, "(FN, fn)"),
             Self::IF => write!(f, "(IF, if)"),
             Self::RETURN => write!(f, "(RETURN, return)"),
+            Self::VAR => write!(f, "(VAR, var)"),
             Self::EOF => write!(f, "(EOF, )"),
         }
     }
@@ -99,6 +102,7 @@ impl Token {
             Self::FN => "fn".to_string(),
             Self::IF => "if".to_string(),
             Self::RETURN => "return".to_string(),
+            Self::VAR => "var".to_string(),
             _ => '\0'.to_string(),
         }
     }
@@ -220,6 +224,7 @@ fn handle_keyword(word: &str) -> Option<Token> {
         "if" => Some(Token::IF),
         "return" => Some(Token::RETURN),
         "fn" => Some(Token::FN),
+        "var" => Some(Token::VAR),
         _ => None,
     }
 }

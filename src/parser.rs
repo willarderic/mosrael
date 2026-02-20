@@ -13,7 +13,7 @@ binary         → expression operator expression ;
 operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
                | "+"  | "-"  | "*" | "/" ;
 */
-use crate::ast::{Declaration, Function, Node, Statement};
+use crate::ast::{Declaration, Expression, Function, Node, Statement, UnaryExpression, Variable};
 use crate::lexer::Token;
 
 type ParseError = String;
@@ -70,6 +70,7 @@ impl Parser {
     fn parse_decl(&mut self) -> Declaration {
         match self.curr_token {
             Token::FN => self.parse_fn_decl(),
+            Token::VAR => self.parse_var_decl(),
             _ => panic!("No matching declaration"),
         }
     }
@@ -89,6 +90,26 @@ impl Parser {
         let stmts = self.parse_block();
 
         Declaration::FunctionDeclaration(Function { name, stmts })
+    }
+
+    fn parse_var_decl(&mut self) -> Declaration {
+        self.consume(Token::VAR);
+
+        let name = match &self.curr_token {
+            Token::IDENTIFIER(ident) => ident.clone(),
+            _ => panic!("Expected identifier, got {}", self.curr_token),
+        };
+        self.advance();
+        self.consume(Token::ASSIGN);
+
+        let value = match &self.curr_token {
+            Token::NUMBER(num) => num.clone(),
+            _ => panic!("Expected number, got {}", self.curr_token),
+        };
+        self.advance();
+        self.consume(Token::SEMICOLON);
+
+        Declaration::VariableDeclaration(Variable { name, value })
     }
 
     fn parse_block(&mut self) -> Vec<Statement> {
@@ -115,12 +136,54 @@ impl Parser {
 
     fn parse_return_statement(&mut self) -> Statement {
         self.consume(Token::RETURN);
-        match self.curr_token {
-            Token::NUMBER(num) => {
-                self.advance();
-                Statement::ReturnStatement(num)
-            }
-            _ => panic!("Expected number, got {}", self.curr_token),
-        }
+
+        Statement::ReturnStatement(self.parse_expr())
+    }
+
+    fn parse_expr_statement(&mut self) -> Statement {
+        Statement::ExpressionStatement(self.parse_expr())
+    }
+
+    fn parse_expr(&mut self) -> Expression {
+        let left = match self.curr_token {
+            Token::IDENTIFIER(_) => self.parse_ident_expr(),
+            Token::NUMBER(_) => self.parse_num_expr(),
+            Token::DASH => self.parse_prefix_expr(),
+            _ => panic!("Expected expression, got {}", self.curr_token),
+        };
+
+        left
+    }
+
+    fn parse_ident_expr(&mut self) -> Expression {
+        let ident = match &self.curr_token {
+            Token::IDENTIFIER(s) => s.clone(),
+            _ => panic!("Expected ident, got {}", self.curr_token),
+        };
+
+        self.advance();
+
+        Expression::Identifier(ident)
+    }
+
+    fn parse_num_expr(&mut self) -> Expression {
+        let num = match self.curr_token {
+            Token::NUMBER(x) => x,
+            _ => panic!("Expected number but got {}", self.curr_token),
+        };
+        self.advance();
+
+        Expression::Number(num)
+    }
+
+    fn parse_prefix_expr(&mut self) -> Expression {
+        let op = match self.curr_token {
+            Token::DASH => self.curr_token.clone(),
+            _ => panic!("Expected prefix operator, got {}", self.curr_token),
+        };
+        self.advance();
+        let operand = Box::new(self.parse_expr());
+
+        Expression::Unary(UnaryExpression { op, operand })
     }
 }

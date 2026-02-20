@@ -25,5 +25,5 @@ fn main() {
     tokens.iter().for_each(|tok| println!("\t{}", tok));
     let mut parser = Parser::new(tokens);
     let program = parser.parse();
-    println!("AST:\n{}", program);
+    println!("{}", program);
 }

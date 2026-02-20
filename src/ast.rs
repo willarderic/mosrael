@@ -2,31 +2,34 @@ use std::fmt::{Display, Formatter, Result};
 use std::vec;
 
 use crate::lexer::Token;
+
 /*
 program     → decl_list EOF
 decl        → fn_decl
+            | var_decl ;
 decl_list   → epsilon
             | decl decl_list ;
 fn_decl     → "fn" ident "(" ")" block ;
+var_decl    → "var" ident "=" integer ;
 block       → stmt_list ;
 stmt        → return_stmt ;
 stmt_list   → epsilon
             | stmt stmt_list ";" ;
-return_stmt → "return" integer ;
+return_stmt → "return" expr;
 
 
 
 
-expression     → literal
-               | unary
-               | binary
-               | grouping ;
+expr        → literal
+            | unary
+            | binary
+            | grouping ;
 
-literal        → NUMBER | STRING | IDENT | "true" | "false" | "null" ;
-grouping       → "(" expression ")" ;
-unary          → ( "-" | "!" ) expression ;
-binary         → expression operator expression ;
-operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
+literal     → NUMBER | STRING | IDENT | "true" | "false" | "null" ;
+grouping    → "(" expr")" ;
+unary       → ( "-" | "!" ) expr ;
+binary      → expression operator expression ;
+operator    → "==" | "!=" | "<" | "<=" | ">" | ">="
                | "+"  | "-"  | "*" | "/" ;
 */
 pub enum Node {
@@ -39,9 +42,8 @@ impl Display for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Self::Program(decls) => {
-                decls
-                    .iter()
-                    .for_each(|decl| write!(f, "{}\n", decl).unwrap());
+                write!(f, "PROGRAM\n").unwrap();
+                decls.iter().for_each(|decl| write!(f, "{}", decl).unwrap());
 
                 Ok(())
             }
@@ -54,6 +56,7 @@ impl Display for Node {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Declaration {
     FunctionDeclaration(Function),
+    VariableDeclaration(Variable),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -62,42 +65,47 @@ pub struct Function {
     pub stmts: Vec<Statement>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Variable {
+    pub name: String,
+    pub value: u64,
+}
+
 impl Display for Declaration {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Self::FunctionDeclaration(func) => {
-                write!(f, "\t{}\n", func.name).unwrap();
+                write!(f, "\tFUNCTION({})\n", func.name).unwrap();
                 func.stmts
                     .iter()
-                    .for_each(|stmt| write!(f, "\t\t{}\n", stmt).unwrap());
+                    .for_each(|stmt| write!(f, "\t\t{}", stmt).unwrap());
                 Ok(())
             }
+            Self::VariableDeclaration(var) => write!(f, "\tVAR({}, {})\n", var.name, var.value),
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
-    ReturnStatement(u64),
+    ReturnStatement(Expression),
+    ExpressionStatement(Expression),
 }
 
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Self::ReturnStatement(num) => write!(f, "RETURN({})", num),
+            Self::ReturnStatement(expr) => write!(f, "RETURN({})", expr),
+            Self::ExpressionStatement(expr) => write!(f, "EXPR({})", expr),
         }
     }
 }
-//#[derive(Clone, Debug, Eq, PartialEq)]
-//pub struct ExpressionStatement {
-//    pub expr: Expression,
-//}
-//
-//#[derive(Clone, Debug, Eq, PartialEq)]
-//pub struct PrefixExpression {
-//    pub op: Token,
-//    pub operand: Box<Expression>,
-//}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UnaryExpression {
+    pub op: Token,
+    pub operand: Box<Expression>,
+}
 //
 //#[derive(Clone, Debug, Eq, PartialEq)]
 //pub struct InfixExpression {
@@ -106,21 +114,19 @@ impl Display for Statement {
 //    pub right: Box<Expression>,
 //}
 //
-//#[derive(Clone, Debug, Eq, PartialEq)]
-//pub enum Expression {
-//    Identifier(String),
-//    Number(u64),
-//    Prefix(PrefixExpression),
-//    Infix(InfixExpression),
-//}
-//
-//impl Display for Expression {
-//    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-//        match self {
-//            Self::Identifier(ident) => write!(f, "{}", ident),
-//            Self::Number(num) => write!(f, "{}", num),
-//            Self::Prefix(prefix) => write!(f, "({}, {})", prefix.op, prefix.operand),
-//            Self::Infix(infix) => write!(f, "({}, {}, {})", infix.op, infix.left, infix.right),
-//        }
-//    }
-//}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Expression {
+    Identifier(String),
+    Number(u64),
+    Unary(UnaryExpression),
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Self::Identifier(ident) => write!(f, "{}", ident),
+            Self::Number(num) => write!(f, "{}", num),
+            Self::Unary(unary) => write!(f, "({}, {})", unary.op, unary.operand),
+        }
+    }
+}
