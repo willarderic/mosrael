@@ -1,19 +1,6 @@
-/*
-
-
-expression     → literal
-               | unary
-               | binary
-               | grouping ;
-
-literal        → NUMBER | STRING | IDENT | "true" | "false" | "null" ;
-grouping       → "(" expression ")" ;
-unary          → ( "-" | "!" ) expression ;
-binary         → expression operator expression ;
-operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
-               | "+"  | "-"  | "*" | "/" ;
-*/
-use crate::ast::{Declaration, Expression, Function, Node, Statement, UnaryExpression, Variable};
+use crate::ast::{
+    BinaryExpression, Declaration, Expression, Function, Node, Statement, UnaryExpression, Variable,
+};
 use crate::lexer::Token;
 
 type ParseError = String;
@@ -140,12 +127,27 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Expression {
-        let left = match self.curr_token {
+        let mut left = match self.curr_token {
             Token::IDENTIFIER(_) => self.parse_ident_expr(),
             Token::NUMBER(_) => self.parse_num_expr(),
             Token::DASH => self.parse_prefix_expr(),
-            _ => panic!("Expected expression, got {}", self.curr_token),
+            _ => panic!("Expected unary expression, got {}", self.curr_token),
         };
+        while self.curr_token != Token::SEMICOLON {
+            left = match self.curr_token {
+                Token::PLUS
+                | Token::DASH
+                | Token::ASTERISK
+                | Token::SLASH
+                | Token::ASSIGN
+                | Token::LT
+                | Token::LEQ
+                | Token::GT
+                | Token::GEQ
+                | Token::EQ => self.parse_binary_expr(left),
+                _ => panic!("Expected binary expression, got {}", self.curr_token),
+            };
+        }
 
         left
     }
@@ -180,5 +182,29 @@ impl Parser {
         let operand = Box::new(self.parse_expr());
 
         Expression::Unary(UnaryExpression { op, operand })
+    }
+
+    fn parse_binary_expr(&mut self, left: Expression) -> Expression {
+        let op = match self.curr_token {
+            Token::PLUS
+            | Token::DASH
+            | Token::ASTERISK
+            | Token::SLASH
+            | Token::ASSIGN
+            | Token::LT
+            | Token::LEQ
+            | Token::GT
+            | Token::GEQ
+            | Token::EQ => self.curr_token.clone(),
+            _ => panic!("Expected binary expression, got {}", self.curr_token),
+        };
+        self.advance();
+        let right = self.parse_expr();
+
+        Expression::Binary(BinaryExpression {
+            op,
+            left: Box::new(left),
+            right: Box::new(right),
+        })
     }
 }

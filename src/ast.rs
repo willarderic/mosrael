@@ -25,8 +25,8 @@ expr        → literal
             | grouping ;
 
 literal     → NUMBER | STRING | IDENT | "true" | "false" | "null" ;
-grouping    → "(" expr")" ;
-unary       → ( "-" | "!" ) expr ;
+grouping    → "(" expr ")" ;
+unary       → ( "-" | "~" | "!" ) expr ;
 binary      → expression operator expression ;
 operator    → "==" | "!=" | "<" | "<=" | ">" | ">="
                | "+"  | "-"  | "*" | "/" ;
@@ -105,19 +105,20 @@ pub struct UnaryExpression {
     pub op: Token,
     pub operand: Box<Expression>,
 }
-//
-//#[derive(Clone, Debug, Eq, PartialEq)]
-//pub struct InfixExpression {
-//    pub op: Token,
-//    pub left: Box<Expression>,
-//    pub right: Box<Expression>,
-//}
-//
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BinaryExpression {
+    pub op: Token,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     Identifier(String),
     Number(u64),
     Unary(UnaryExpression),
+    Binary(BinaryExpression),
 }
 
 impl Display for Expression {
@@ -126,6 +127,7 @@ impl Display for Expression {
             Self::Identifier(ident) => write!(f, "{}", ident),
             Self::Number(num) => write!(f, "{}", num),
             Self::Unary(unary) => write!(f, "({}, {})", unary.op, unary.operand),
+            Self::Binary(binary) => write!(f, "({}, {}, {})", binary.op, binary.left, binary.right),
         }
     }
 }
