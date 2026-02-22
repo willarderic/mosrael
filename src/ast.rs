@@ -23,12 +23,13 @@ expr        → literal
             | unary
             | binary
             | grouping ;
-
+expr_list   → epsilon
+            | expr "," expr_list
 literal     → NUMBER | STRING | IDENT | "true" | "false" | "null" ;
 grouping    → "(" expr ")" ;
 unary       → ( "-" | "~" | "!" ) expr ;
-binary      → expression operator expression ;
-operator    → "==" | "!=" | "<" | "<=" | ">" | ">="
+binary      → expr op expr ;
+op    → "==" | "!=" | "<" | "<=" | ">" | ">="
                | "+"  | "-"  | "*" | "/" ;
 */
 pub enum Node {
@@ -77,7 +78,7 @@ impl Display for Declaration {
                 write!(f, "\tFUNCTION({})\n", func.name).unwrap();
                 func.stmts
                     .iter()
-                    .for_each(|stmt| write!(f, "\t\t{}", stmt).unwrap());
+                    .for_each(|stmt| write!(f, "\t\t{}\n", stmt).unwrap());
                 Ok(())
             }
             Self::VariableDeclaration(var) => write!(f, "\tVAR({}, {})\n", var.name, var.value),
@@ -101,13 +102,13 @@ impl Display for Statement {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UnaryExpression {
+pub struct PrefixExpression {
     pub op: Token,
     pub operand: Box<Expression>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BinaryExpression {
+pub struct InfixExpression {
     pub op: Token,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
@@ -117,8 +118,8 @@ pub struct BinaryExpression {
 pub enum Expression {
     Identifier(String),
     Number(u64),
-    Unary(UnaryExpression),
-    Binary(BinaryExpression),
+    Prefix(PrefixExpression),
+    Infix(InfixExpression),
 }
 
 impl Display for Expression {
@@ -126,8 +127,8 @@ impl Display for Expression {
         match self {
             Self::Identifier(ident) => write!(f, "{}", ident),
             Self::Number(num) => write!(f, "{}", num),
-            Self::Unary(unary) => write!(f, "({}, {})", unary.op, unary.operand),
-            Self::Binary(binary) => write!(f, "({}, {}, {})", binary.op, binary.left, binary.right),
+            Self::Prefix(prefix) => write!(f, "({}, {})", prefix.op, prefix.operand),
+            Self::Infix(infix) => write!(f, "({}, {}, {})", infix.op, infix.left, infix.right),
         }
     }
 }

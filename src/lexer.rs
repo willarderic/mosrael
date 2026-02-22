@@ -22,6 +22,7 @@ pub enum Token {
     SLASH,
     ASSIGN,
     BANG,
+    TILDE,
     LT,
     GT,
     LEQ,
@@ -57,6 +58,7 @@ impl std::fmt::Display for Token {
             Self::SLASH => write!(f, "(SLASH, /)"),
             Self::ASSIGN => write!(f, "(ASSIGN, =)"),
             Self::BANG => write!(f, "(BANG, !)"),
+            Self::TILDE => write!(f, "(TILDE, ~)"),
             Self::LT => write!(f, "(LT, <)"),
             Self::GT => write!(f, "(GT, >)"),
             Self::LEQ => write!(f, "(LEQ, <=)"),
@@ -92,6 +94,7 @@ impl Token {
             Self::SLASH => '/'.to_string(),
             Self::ASSIGN => '='.to_string(),
             Self::BANG => '!'.to_string(),
+            Self::TILDE => '~'.to_string(),
             Self::LT => '<'.to_string(),
             Self::GT => '>'.to_string(),
             Self::LEQ => "<=".to_string(),
@@ -117,6 +120,7 @@ fn token_from(lexeme: &str) -> Token {
         "<" => Token::LT,
         ">" => Token::GT,
         "!" => Token::BANG,
+        "~" => Token::TILDE,
         ":" => Token::COLON,
         "+" => Token::PLUS,
         "-" => Token::DASH,
@@ -151,6 +155,8 @@ fn is_punctuator(c: char) -> bool {
         '<' => true,
         '>' => true,
         '?' => true,
+        '!' => true,
+        '~' => true,
         ':' => true,
         ';' => true,
         _ => false,
@@ -167,16 +173,6 @@ fn is_alpha(c: char) -> bool {
 
 fn is_alphanumeric(c: char) -> bool {
     is_digit(c) || is_alpha(c)
-}
-
-fn is_whitespace(c: char) -> bool {
-    match c {
-        ' ' => true,
-        '\t' => true,
-        '\n' => true,
-        '\r' => true,
-        _ => false,
-    }
 }
 
 fn punctuator_eq<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>) -> Token {
