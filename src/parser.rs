@@ -1,17 +1,17 @@
 use crate::ast::{
-    Declaration, Expression, Function, InfixExpression, Node, PrefixExpression, Statement, Variable,
+    Declaration, Expression, For, Function, GlobalDeclaration, InfixExpression, Node,
+    PrefixExpression, Statement, Variable,
 };
 use crate::lexer::Token;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
 enum Precedence {
     NONE = 0,
-    ASSIGN = 1,
-    CONDITIONAL = 2,
-    SUM = 3,
-    PRODUCT = 4,
-    PREFIX = 5,
-    POSTFIX = 7,
+    CONDITIONAL = 1,
+    SUM = 2,
+    PRODUCT = 3,
+    PREFIX = 4,
+    POSTFIX = 5,
     CALL = 6,
 }
 
@@ -27,7 +27,6 @@ fn get_infix_precedence(tok: &Token) -> Precedence {
         Token::PLUS | Token::DASH => Precedence::SUM,
         Token::ASTERISK | Token::SLASH => Precedence::PRODUCT,
         Token::LT | Token::LEQ | Token::GT | Token::GEQ => Precedence::CONDITIONAL,
-        Token::ASSIGN => Precedence::ASSIGN,
         _ => Precedence::NONE,
     }
 }
@@ -66,23 +65,23 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Node {
-        let mut decls = Vec::new();
+        let mut gdecls = Vec::new();
         while self.curr_token != Token::EOF {
-            decls.push(self.parse_decl());
+            gdecls.push(self.parse_gdecl());
         }
 
-        Node::Program(decls)
+        Node::Program(gdecls)
     }
 
-    fn parse_decl(&mut self) -> Declaration {
+    fn parse_gdecl(&mut self) -> GlobalDeclaration {
         match self.curr_token {
-            Token::FN => self.parse_fn_decl(),
-            Token::VAR => self.parse_var_decl(),
+            Token::FN => self.parse_fn_gdecl(),
+            Token::VAR => self.parse_var_gdecl(),
             _ => panic!("No matching declaration"),
         }
     }
 
-    fn parse_fn_decl(&mut self) -> Declaration {
+    fn parse_fn_gdecl(&mut self) -> GlobalDeclaration {
         self.consume(Token::FN);
 
         let name = match &self.curr_token {
@@ -94,9 +93,45 @@ impl Parser {
         self.consume(Token::LPAREN);
         self.consume(Token::RPAREN);
 
-        let stmts = self.parse_block();
+        let decls = self.parse_block();
 
-        Declaration::FunctionDeclaration(Function { name, stmts })
+        GlobalDeclaration::FunctionDeclaration(Function { name, decls })
+    }
+
+    fn parse_var_gdecl(&mut self) -> GlobalDeclaration {
+        self.consume(Token::VAR);
+
+        let name = match &self.curr_token {
+            Token::IDENTIFIER(ident) => ident.clone(),
+            _ => panic!("Expected identifier, got {}", self.curr_token),
+        };
+        let mut typ: Option<String> = None;
+        if let Token::IDENTIFIER(ident) = &self.curr_token {
+            typ = Some(ident.clone());
+            self.advance();
+        }
+
+        let var = match self.curr_token {
+            Token::ASSIGN => {
+                self.consume(Token::ASSIGN);
+                let value = Some(self.parse_expr(Precedence::NONE));
+                GlobalDeclaration::VariableDeclaration(Variable { name, typ, value })
+            }
+            Token::SEMICOLON => {
+                if let None = &typ {
+                    panic!("Cannot infer type of {}", name);
+                }
+                GlobalDeclaration::VariableDeclaration(Variable {
+                    name,
+                    typ,
+                    value: None,
+                })
+            }
+            _ => panic!("Expected \";\" or \"=\" but got {}", self.curr_token),
+        };
+        self.consume(Token::SEMICOLON);
+
+        var
     }
 
     fn parse_var_decl(&mut self) -> Declaration {
@@ -107,33 +142,117 @@ impl Parser {
             _ => panic!("Expected identifier, got {}", self.curr_token),
         };
         self.advance();
-        self.consume(Token::ASSIGN);
-        let value = self.parse_expr(Precedence::NONE);
-        self.consume(Token::SEMICOLON);
+        let mut typ: Option<String> = None;
+        if let Token::IDENTIFIER(ident) = &self.curr_token {
+            typ = Some(ident.clone());
+            self.advance();
+        }
 
-        Declaration::VariableDeclaration(Variable { name, value })
+        match self.curr_token {
+            Token::ASSIGN => {
+                self.consume(Token::ASSIGN);
+                let value = Some(self.parse_expr(Precedence::NONE));
+                return Declaration::VariableDeclaration(Variable { name, typ, value });
+            }
+            Token::SEMICOLON => {
+                if let None = &typ {
+                    panic!("Cannot infer type of {}", name);
+                }
+                return Declaration::VariableDeclaration(Variable {
+                    name,
+                    typ,
+                    value: None,
+                });
+            }
+            _ => panic!("Expected \";\" or \"=\" but got {}", self.curr_token),
+        };
     }
 
-    fn parse_block(&mut self) -> Vec<Statement> {
+    fn parse_block(&mut self) -> Vec<Declaration> {
         self.consume(Token::LBRACE);
-        let mut stmts: Vec<Statement> = Vec::new();
+        let mut decls: Vec<Declaration> = Vec::new();
         while self.curr_token != Token::RBRACE {
-            stmts.push(self.parse_statement());
+            decls.push(self.parse_decl());
         }
         self.consume(Token::RBRACE);
 
-        stmts
+        decls
     }
 
-    fn parse_statement(&mut self) -> Statement {
-        let stmt = match self.curr_token {
-            Token::RETURN => self.parse_return_statement(),
-            _ => self.parse_expr_statement(),
+    fn parse_decl(&mut self) -> Declaration {
+        let decl = match self.curr_token {
+            Token::VAR => self.parse_var_decl(),
+            _ => Declaration::Statement(self.parse_statement()),
         };
 
         self.consume(Token::SEMICOLON);
 
-        stmt
+        decl
+    }
+
+    fn parse_statement(&mut self) -> Statement {
+        match self.curr_token {
+            Token::RETURN => self.parse_return_statement(),
+            Token::FOR => self.parse_for_statement(),
+            Token::IDENTIFIER(_) => self.parse_shortvardecl_statement(),
+            //Token::IF => self.parse_if_statement(),
+            _ => self.parse_expr_statement(),
+        }
+    }
+
+    fn parse_shortvardecl_statement(&mut self) -> Statement {
+        let name = match &self.curr_token {
+            Token::IDENTIFIER(ident) => ident.clone(),
+            _ => panic!("Expected identifier, got {}", self.curr_token),
+        };
+        self.advance();
+        self.consume(Token::ASSIGN);
+        let value = Some(self.parse_expr(Precedence::NONE));
+
+        Statement::ShortVarDeclStatement(Variable {
+            name,
+            typ: None,
+            value,
+        })
+    }
+
+    fn parse_for_statement(&mut self) -> Statement {
+        self.consume(Token::FOR);
+        let stmt = self.parse_statement();
+
+        match self.curr_token {
+            Token::SEMICOLON => {
+                let pre = Some(Box::new(stmt));
+                self.consume(Token::SEMICOLON);
+                let cond = self.parse_expr(Precedence::NONE);
+                self.consume(Token::SEMICOLON);
+                let post = Some(Box::new(self.parse_statement()));
+                let block = self.parse_block();
+                return Statement::ForStatement(For {
+                    pre,
+                    cond,
+                    post,
+                    block,
+                });
+            }
+            Token::LBRACE => {
+                let cond = match stmt {
+                    Statement::ExpressionStatement(expr) => expr,
+                    _ => panic!("expected expression in for loop"),
+                };
+                let block = self.parse_block();
+                return Statement::ForStatement(For {
+                    pre: None,
+                    cond,
+                    post: None,
+                    block,
+                });
+            }
+            _ => panic!(
+                "Expected \";\" or \"LBRACE\" in for statement, got {}",
+                self.curr_token
+            ),
+        }
     }
 
     fn parse_return_statement(&mut self) -> Statement {
@@ -161,7 +280,6 @@ impl Parser {
                 | Token::DASH
                 | Token::ASTERISK
                 | Token::SLASH
-                | Token::ASSIGN
                 | Token::LT
                 | Token::LEQ
                 | Token::GT
@@ -212,7 +330,6 @@ impl Parser {
             | Token::DASH
             | Token::ASTERISK
             | Token::SLASH
-            | Token::ASSIGN
             | Token::LT
             | Token::LEQ
             | Token::GT
