@@ -5,6 +5,9 @@ fn main() {
     for i = 0; i < 10; i = i + 1 {
         b = b / i;
     }
+    if a == 10 {
+        return b;
+    }
 
     return ~b;
 }

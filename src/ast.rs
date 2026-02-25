@@ -125,7 +125,7 @@ impl Display for Declaration {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     ForStatement(For),
-    IfStatement(),
+    IfStatement(If),
     ReturnStatement(Expression),
     ExpressionStatement(Expression),
     VariableDeclaration(Variable),
@@ -136,6 +136,12 @@ pub struct For {
     pub pre: Option<Box<Expression>>,
     pub cond: Expression,
     pub post: Option<Box<Expression>>,
+    pub block: Vec<Statement>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct If {
+    pub cond: Expression,
     pub block: Vec<Statement>,
 }
 
@@ -157,24 +163,31 @@ impl Display for Statement {
                 for_stmt
                     .block
                     .iter()
-                    .for_each(|stmt| write!(f, "\t\t\t{}", stmt).unwrap());
+                    .for_each(|stmt| write!(f, "\t\t{}", stmt).unwrap());
 
                 Ok(())
             }
             Self::VariableDeclaration(var) => {
                 let mut s = format!("\tVAR({}", var.name);
-                let s = match &var.typ {
+                s = match &var.typ {
                     Some(t) => format!("{}, {}", s, t),
                     None => format!("{}, None", s),
                 };
 
-                let s = match &var.value {
+                s = match &var.value {
                     Some(v) => format!("{}, {})", s, v),
                     None => format!("{}, None)", s),
                 };
                 write!(f, "{}", s)
             }
-            Self::IfStatement() => write!(f, "\tIF"),
+            Self::IfStatement(if_stmt) => {
+                write!(f, "\tIF({})\n", if_stmt.cond);
+                if_stmt
+                    .block
+                    .iter()
+                    .for_each(|stmt| write!(f, "\t\t{}", stmt).unwrap());
+                Ok(())
+            }
         }
     }
 }

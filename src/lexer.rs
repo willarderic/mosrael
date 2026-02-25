@@ -65,7 +65,7 @@ impl std::fmt::Display for Token {
             Self::GT => write!(f, "(GT, >)"),
             Self::LEQ => write!(f, "(LEQ, <=)"),
             Self::GEQ => write!(f, "(GEQ, >=)"),
-            Self::EQ => write!(f, "(EQ, =="),
+            Self::EQ => write!(f, "(EQ, ==)"),
             Self::NEQ => write!(f, "(NEQ, !=)"),
             Self::QUESTION => write!(f, "(QUESTION, ?)"),
             Self::FN => write!(f, "(FN, fn)"),
@@ -199,9 +199,7 @@ fn punctuator_eq<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>) -> 
 
 fn handle_punctuator<I: Iterator<Item = char>>(c: char, chars: &mut Peekable<I>) -> Token {
     match c {
-        '>' => punctuator_eq(c, chars),
-        '<' => punctuator_eq(c, chars),
-        '!' => punctuator_eq(c, chars),
+        '>' | '<' | '!' | '=' => punctuator_eq(c, chars),
         _ => {
             let lexeme: String = c.to_string();
             token_from(lexeme.as_str())

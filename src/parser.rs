@@ -1,5 +1,5 @@
 use crate::ast::{
-    Declaration, Expression, For, Function, InfixExpression, Node, PrefixExpression, Statement,
+    Declaration, Expression, For, Function, If, InfixExpression, Node, PrefixExpression, Statement,
     Variable,
 };
 use crate::lexer::Token;
@@ -28,7 +28,7 @@ fn get_infix_precedence(tok: &Token) -> Precedence {
         Token::ASSIGN => Precedence::ASSIGN,
         Token::PLUS | Token::DASH => Precedence::SUM,
         Token::ASTERISK | Token::SLASH => Precedence::PRODUCT,
-        Token::LT | Token::LEQ | Token::GT | Token::GEQ => Precedence::CONDITIONAL,
+        Token::LT | Token::LEQ | Token::GT | Token::GEQ | Token::EQ => Precedence::CONDITIONAL,
         _ => Precedence::NONE,
     }
 }
@@ -153,13 +153,21 @@ impl Parser {
         match self.curr_token {
             Token::RETURN => self.parse_return_statement(),
             Token::FOR => self.parse_for_statement(),
+            Token::IF => self.parse_if_statement(),
             Token::VAR => match self.parse_var_decl() {
                 Declaration::VariableDeclaration(var) => Statement::VariableDeclaration(var),
                 _ => panic!("Expected variable declaration"),
             },
-            //Token::IF => self.parse_if_statement(),
             _ => self.parse_expr_statement(),
         }
+    }
+
+    fn parse_if_statement(&mut self) -> Statement {
+        self.consume(Token::IF);
+        let cond = self.parse_expr(Precedence::NONE);
+        let block = self.parse_block();
+
+        return Statement::IfStatement(If { cond, block });
     }
 
     fn parse_for_statement(&mut self) -> Statement {
