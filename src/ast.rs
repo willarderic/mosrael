@@ -64,7 +64,9 @@ impl Display for Node {
         match self {
             Self::Program(decls) => {
                 write!(f, "PROGRAM\n").unwrap();
-                decls.iter().for_each(|decl| write!(f, "{}", decl).unwrap());
+                decls
+                    .iter()
+                    .for_each(|decl| write!(f, "{}\n", decl).unwrap());
 
                 Ok(())
             }

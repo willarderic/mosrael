@@ -1,6 +1,6 @@
 use crate::ast::{
-    Declaration, Expression, For, Function, If, InfixExpression, Node, PrefixExpression, Statement,
-    Variable,
+    CallExpression, Declaration, Expression, For, Function, If, InfixExpression, Node,
+    PrefixExpression, Statement, Variable,
 };
 use crate::lexer::Token;
 
@@ -29,6 +29,7 @@ fn get_infix_precedence(tok: &Token) -> Precedence {
         Token::PLUS | Token::DASH => Precedence::SUM,
         Token::ASTERISK | Token::SLASH => Precedence::PRODUCT,
         Token::LT | Token::LEQ | Token::GT | Token::GEQ | Token::EQ => Precedence::CONDITIONAL,
+        Token::LPAREN => Precedence::CALL,
         _ => Precedence::NONE,
     }
 }
@@ -149,7 +150,6 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Statement {
-        println!("Parsing statement");
         match self.curr_token {
             Token::RETURN => self.parse_return_statement(),
             Token::FOR => self.parse_for_statement(),
@@ -239,7 +239,8 @@ impl Parser {
                 | Token::LEQ
                 | Token::GT
                 | Token::GEQ
-                | Token::EQ => self.parse_infix_expr(left),
+                | Token::EQ
+                | Token::LPAREN => self.parse_infix_expr(left),
                 _ => panic!("Expected infix expression, got {}", self.curr_token),
             };
         }
@@ -280,7 +281,7 @@ impl Parser {
     }
 
     fn parse_infix_expr(&mut self, left: Expression) -> Expression {
-        let op = match self.curr_token {
+        match self.curr_token {
             Token::ASSIGN
             | Token::PLUS
             | Token::DASH
@@ -290,16 +291,32 @@ impl Parser {
             | Token::LEQ
             | Token::GT
             | Token::GEQ
-            | Token::EQ => self.curr_token.clone(),
-            _ => panic!("Expected binary expression, got {}", self.curr_token),
-        };
-        self.advance();
-        let right = self.parse_expr(get_infix_precedence(&op));
+            | Token::EQ => {
+                let op = self.curr_token.clone();
+                self.advance();
+                let right = self.parse_expr(get_infix_precedence(&op));
 
-        Expression::Infix(InfixExpression {
-            op,
-            left: Box::new(left),
-            right: Box::new(right),
-        })
+                Expression::Infix(InfixExpression {
+                    op,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                })
+            }
+            Token::LPAREN => {
+                let name = match left {
+                    Expression::Identifier(ident) => ident.clone(),
+                    _ => panic!("Expected ident for function call, got {}", left),
+                };
+                self.consume(Token::LPAREN);
+                // parse expr_list here
+                self.consume(Token::RPAREN);
+
+                Expression::Call(CallExpression {
+                    func: name,
+                    args: Vec::new(),
+                })
+            }
+            _ => panic!("Expected binary expression, got {}", self.curr_token),
+        }
     }
 }
