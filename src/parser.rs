@@ -1,18 +1,19 @@
 use crate::ast::{
-    Declaration, Expression, For, Function, GlobalDeclaration, InfixExpression, Node,
-    PrefixExpression, Statement, Variable,
+    Declaration, Expression, For, Function, InfixExpression, Node, PrefixExpression, Statement,
+    Variable,
 };
 use crate::lexer::Token;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
 enum Precedence {
     NONE = 0,
-    CONDITIONAL = 1,
-    SUM = 2,
-    PRODUCT = 3,
-    PREFIX = 4,
-    POSTFIX = 5,
-    CALL = 6,
+    ASSIGN = 1,
+    CONDITIONAL = 2,
+    SUM = 3,
+    PRODUCT = 4,
+    PREFIX = 5,
+    POSTFIX = 6,
+    CALL = 7,
 }
 
 pub struct Parser {
@@ -24,6 +25,7 @@ pub struct Parser {
 
 fn get_infix_precedence(tok: &Token) -> Precedence {
     match tok {
+        Token::ASSIGN => Precedence::ASSIGN,
         Token::PLUS | Token::DASH => Precedence::SUM,
         Token::ASTERISK | Token::SLASH => Precedence::PRODUCT,
         Token::LT | Token::LEQ | Token::GT | Token::GEQ => Precedence::CONDITIONAL,
@@ -65,23 +67,23 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Node {
-        let mut gdecls = Vec::new();
+        let mut decls = Vec::new();
         while self.curr_token != Token::EOF {
-            gdecls.push(self.parse_gdecl());
+            decls.push(self.parse_decl());
         }
 
-        Node::Program(gdecls)
+        Node::Program(decls)
     }
 
-    fn parse_gdecl(&mut self) -> GlobalDeclaration {
+    fn parse_decl(&mut self) -> Declaration {
         match self.curr_token {
-            Token::FN => self.parse_fn_gdecl(),
-            Token::VAR => self.parse_var_gdecl(),
+            Token::FN => self.parse_fn_decl(),
+            Token::VAR => self.parse_var_decl(),
             _ => panic!("No matching declaration"),
         }
     }
 
-    fn parse_fn_gdecl(&mut self) -> GlobalDeclaration {
+    fn parse_fn_decl(&mut self) -> Declaration {
         self.consume(Token::FN);
 
         let name = match &self.curr_token {
@@ -93,45 +95,9 @@ impl Parser {
         self.consume(Token::LPAREN);
         self.consume(Token::RPAREN);
 
-        let decls = self.parse_block();
+        let stmts = self.parse_block();
 
-        GlobalDeclaration::FunctionDeclaration(Function { name, decls })
-    }
-
-    fn parse_var_gdecl(&mut self) -> GlobalDeclaration {
-        self.consume(Token::VAR);
-
-        let name = match &self.curr_token {
-            Token::IDENTIFIER(ident) => ident.clone(),
-            _ => panic!("Expected identifier, got {}", self.curr_token),
-        };
-        let mut typ: Option<String> = None;
-        if let Token::IDENTIFIER(ident) = &self.curr_token {
-            typ = Some(ident.clone());
-            self.advance();
-        }
-
-        let var = match self.curr_token {
-            Token::ASSIGN => {
-                self.consume(Token::ASSIGN);
-                let value = Some(self.parse_expr(Precedence::NONE));
-                GlobalDeclaration::VariableDeclaration(Variable { name, typ, value })
-            }
-            Token::SEMICOLON => {
-                if let None = &typ {
-                    panic!("Cannot infer type of {}", name);
-                }
-                GlobalDeclaration::VariableDeclaration(Variable {
-                    name,
-                    typ,
-                    value: None,
-                })
-            }
-            _ => panic!("Expected \";\" or \"=\" but got {}", self.curr_token),
-        };
-        self.consume(Token::SEMICOLON);
-
-        var
+        Declaration::FunctionDeclaration(Function { name, stmts })
     }
 
     fn parse_var_decl(&mut self) -> Declaration {
@@ -148,85 +114,65 @@ impl Parser {
             self.advance();
         }
 
-        match self.curr_token {
+        let var = match self.curr_token {
             Token::ASSIGN => {
                 self.consume(Token::ASSIGN);
                 let value = Some(self.parse_expr(Precedence::NONE));
-                return Declaration::VariableDeclaration(Variable { name, typ, value });
+                Declaration::VariableDeclaration(Variable { name, typ, value })
             }
             Token::SEMICOLON => {
                 if let None = &typ {
                     panic!("Cannot infer type of {}", name);
                 }
-                return Declaration::VariableDeclaration(Variable {
+                Declaration::VariableDeclaration(Variable {
                     name,
                     typ,
                     value: None,
-                });
+                })
             }
             _ => panic!("Expected \";\" or \"=\" but got {}", self.curr_token),
         };
+        self.consume(Token::SEMICOLON);
+
+        var
     }
 
-    fn parse_block(&mut self) -> Vec<Declaration> {
+    fn parse_block(&mut self) -> Vec<Statement> {
         self.consume(Token::LBRACE);
-        let mut decls: Vec<Declaration> = Vec::new();
+        let mut stmts: Vec<Statement> = Vec::new();
         while self.curr_token != Token::RBRACE {
-            decls.push(self.parse_decl());
+            stmts.push(self.parse_statement());
         }
         self.consume(Token::RBRACE);
 
-        decls
-    }
-
-    fn parse_decl(&mut self) -> Declaration {
-        let decl = match self.curr_token {
-            Token::VAR => self.parse_var_decl(),
-            _ => Declaration::Statement(self.parse_statement()),
-        };
-
-        self.consume(Token::SEMICOLON);
-
-        decl
+        stmts
     }
 
     fn parse_statement(&mut self) -> Statement {
+        println!("Parsing statement");
         match self.curr_token {
             Token::RETURN => self.parse_return_statement(),
             Token::FOR => self.parse_for_statement(),
-            Token::IDENTIFIER(_) => self.parse_shortvardecl_statement(),
+            Token::VAR => match self.parse_var_decl() {
+                Declaration::VariableDeclaration(var) => Statement::VariableDeclaration(var),
+                _ => panic!("Expected variable declaration"),
+            },
             //Token::IF => self.parse_if_statement(),
             _ => self.parse_expr_statement(),
         }
     }
 
-    fn parse_shortvardecl_statement(&mut self) -> Statement {
-        let name = match &self.curr_token {
-            Token::IDENTIFIER(ident) => ident.clone(),
-            _ => panic!("Expected identifier, got {}", self.curr_token),
-        };
-        self.advance();
-        self.consume(Token::ASSIGN);
-        let value = Some(self.parse_expr(Precedence::NONE));
-
-        Statement::ShortVarDeclStatement(Variable {
-            name,
-            typ: None,
-            value,
-        })
-    }
-
     fn parse_for_statement(&mut self) -> Statement {
         self.consume(Token::FOR);
-        let stmt = self.parse_statement();
+        let expr = self.parse_expr(Precedence::NONE);
 
         match self.curr_token {
             Token::SEMICOLON => {
-                let pre = Some(Box::new(stmt));
+                let pre = Some(Box::new(expr));
                 self.consume(Token::SEMICOLON);
                 let cond = self.parse_expr(Precedence::NONE);
                 self.consume(Token::SEMICOLON);
-                let post = Some(Box::new(self.parse_statement()));
+                let post = Some(Box::new(self.parse_expr(Precedence::NONE)));
                 let block = self.parse_block();
                 return Statement::ForStatement(For {
                     pre,
@@ -236,10 +182,7 @@ impl Parser {
                 });
             }
             Token::LBRACE => {
-                let cond = match stmt {
-                    Statement::ExpressionStatement(expr) => expr,
-                    _ => panic!("expected expression in for loop"),
-                };
+                let cond = expr;
                 let block = self.parse_block();
                 return Statement::ForStatement(For {
                     pre: None,
@@ -257,12 +200,15 @@ impl Parser {
 
     fn parse_return_statement(&mut self) -> Statement {
         self.consume(Token::RETURN);
-
-        Statement::ReturnStatement(self.parse_expr(Precedence::NONE))
+        let expr = self.parse_expr(Precedence::NONE);
+        self.consume(Token::SEMICOLON);
+        Statement::ReturnStatement(expr)
     }
 
     fn parse_expr_statement(&mut self) -> Statement {
-        Statement::ExpressionStatement(self.parse_expr(Precedence::NONE))
+        let expr = self.parse_expr(Precedence::NONE);
+        self.consume(Token::SEMICOLON);
+        Statement::ExpressionStatement(expr)
     }
 
     fn parse_expr(&mut self, precedence: Precedence) -> Expression {
@@ -276,7 +222,8 @@ impl Parser {
             && precedence < get_infix_precedence(&self.curr_token)
         {
             left = match self.curr_token {
-                Token::PLUS
+                Token::ASSIGN
+                | Token::PLUS
                 | Token::DASH
                 | Token::ASTERISK
                 | Token::SLASH
@@ -326,7 +273,8 @@ impl Parser {
 
     fn parse_infix_expr(&mut self, left: Expression) -> Expression {
         let op = match self.curr_token {
-            Token::PLUS
+            Token::ASSIGN
+            | Token::PLUS
             | Token::DASH
             | Token::ASTERISK
             | Token::SLASH
